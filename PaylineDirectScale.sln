@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.32210.238
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaylineDirectScale", "PaylineDirectScale\PaylineDirectScale.csproj", "{5C9A8000-6CDD-4F17-92EF-34FFEE3494BF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5C9A8000-6CDD-4F17-92EF-34FFEE3494BF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5C9A8000-6CDD-4F17-92EF-34FFEE3494BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5C9A8000-6CDD-4F17-92EF-34FFEE3494BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5C9A8000-6CDD-4F17-92EF-34FFEE3494BF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D7789F1A-641E-4CF7-8009-76526899D81C}
+	EndGlobalSection
+EndGlobal
