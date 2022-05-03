@@ -8,7 +8,7 @@
 		<OutputType>Library</OutputType>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<PackageId>Directscale.Payline</PackageId>
-		<Version>0.0.3</Version>
+		<Version>0.0.5</Version>
 		<IsPackable>true</IsPackable>
 		<Authors>Bunty Choudhary</Authors>
 		<Company>Payline</Company>
@@ -25,5 +25,9 @@
 	  <PackageReference Include="Dapper" Version="2.0.123" />
 	  <PackageReference Include="DirectScale.Disco.Extension.Abstractions" Version="1.0.5038" />
 	  <PackageReference Include="Monext.Payline.DotNetSDK" Version="4.8.4" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Reference Include="System.Web.Services" />
 	</ItemGroup>
 </Project>

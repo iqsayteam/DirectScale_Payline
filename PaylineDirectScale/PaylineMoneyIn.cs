@@ -55,11 +55,11 @@ namespace PaylineDirectScale
 
         public override string GenerateOneTimeAuthToken(string payerId, int associateId, string languageCode, string countryCode)
         {
-            return _paylineService.GetHashCode().ToString();
-            //LogMessage($"{DateTime.UtcNow} - PayerId:{payerId}, associateId:{associateId},languageCode:{languageCode},countrycode:{countryCode}", "GenerateOneTimeAuthToken");
-            // var associate = _associateService.GetAssociate(associateId);
-            // var isTempAssociate = associate.AssociateBaseType == 0;
-            // return GetToken(associate, isTempAssociate);
+            //return _paylineService.GetHashCode().ToString();
+            LogMessage($"{DateTime.UtcNow} - PayerId:{payerId}, associateId:{associateId},languageCode:{languageCode},countrycode:{countryCode}", "GenerateOneTimeAuthToken");
+            var associate = _associateService.GetAssociate(associateId);
+            var isTempAssociate = associate.AssociateBaseType == 0;
+            return GetToken(associate, isTempAssociate);
         }
 
         public override SavePaymentForm GetSavePaymentForm(string payerId, int associateId, string languageCode, string countryCode, string oneTimeAuthToken)
@@ -69,14 +69,75 @@ namespace PaylineDirectScale
             var associate = _associateService.GetAssociate(associateId);
             var isTempAssociate = associate.AssociateBaseType == 0;
             string head = $@"
-                         <script src='https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js'></script>
-                         <script src='http://igorescobar.github.io/jQuery-Mask-Plugin/js/jquery.mask.min.js'></script>
+                         <script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>
+                         <script src='https://igorescobar.github.io/jQuery-Mask-Plugin/js/jquery.mask.min.js'></script>
+                         <script src='https://cdnjs.cloudflare.com/ajax/libs/jquery-creditcardvalidator/1.0.0/jquery.creditCardValidator.min.js'></script>
 
  <script>
+    function cardFormValidate(){{
+    var cardValid = false;
+
+    //card number validation
+    $('#card_number').validateCreditCard(function(result){{
+        if(result.valid){{
+            $('#card_number').removeClass('required');
+            cardValid = true;
+        }}else{{
+            $('#card_number').addClass('required');
+            cardValid = false;
+        }}
+    }});
+      
+    //card details validation
+    var cardName = $('#name_on_card').val();
+    var expMonth = $('#expiry_month').val();
+    var expYear = $('#expiry_year').val();
+    var cvv = $('#cvv').val();
+    var regName = /^[a-z ,.'-]+$/i;
+    var regCVV = /^[0-9]{{3,3}}$/;
+    if (!cardValid) {{
+        return cardValid;
+    }}else if (!regCVV.test(cvv)) {{
+        $('#cvv').focus();
+        cardValid = false;
+        return cardValid;
+    }}else if (!regName.test(cardName)) {{
+        cardValid = false;
+        return cardValid;
+    }}else{{
+        return cardValid;
+    }}
+    var email = $('#cardHolderEmail').val();
+    if (email.length < 3 || !ValidateEmail(email)) {{ ShowPaylineError('Please provide a valid email address.'); return cardValid = false; }}
+}}
+
     $(document).ready(() => {{
-                              show(document.getElementsByClassName('toggle-content')[0]);
-                              $('#cardNumber').mask('0000 0000 0000 0000');
-                           }});
+        window.addEventListener('message', receiveMessagePayline, false);
+
+        function receiveMessagePayline(event){{ 
+            var msg = JSON.parse(event.data);
+            if (!msg || (msg.event != 'change')) return;
+            if (msg.message && msg.message.payload) {{ 
+                var payload = msg.message.payload;
+                //console.log('card type: ' + payload.cardType + ' / complete: ' + payload.complete);
+                if (payload.complete) {{
+                    // Possible card types: visa, mastercard, amex, diners, discover, jcb, dankort, unionPay
+                    window.cardValid = true;
+                    window.cardType = payload.cardType;
+                    //alert('Card Complete! Type: ' + payload.cardType);
+                }} else {{
+                    window.cardValid = false;
+                }}
+                
+            }}
+            //console.log('Event fired: ', event); 
+         }}
+
+         $('#card_number').mask('0000 0000 0000 0000');
+          $('#paymentForm input[type=text]').on('keyup',function(){{
+             cardFormValidate();
+         }});
+    }});
     function addSlashes (element) {{
            let ele = document.getElementById(element.id);
            ele = ele.value.split('/').join('');   
@@ -86,16 +147,30 @@ namespace PaylineDirectScale
                document.getElementById(element.id).value = finalVal;
            }}
     }}
-    function SavePaylinePayment(payload) {{
-        var outData = {{}};
-        outData.token = payload.userPaymentOptionId + ""|"" + payload.transactionId + ""|"" + window.cardType;
-        outData.type = window.cardType; 
-        outData.expireMonth = payload.ccExpMonth;
-        outData.expireYear = payload.ccExpYear;
-        outData.last4 = payload.last4Digits;
-    
-        DS_SavePaymentMethod(outData);
+    function ShowPaylineError(msg) {{
+        $('#pay-button').text('Save Payment').prop('disabled', false);
+    }}
+    function sendPaymentToNuvei() {{
+        var cardHolderVal = document.getElementById('cardHolderName').value;
+        var emailVal = document.getElementById('cardHolderEmail').value;
+
+        if (!cardFormValidate()) return;
+
+        SavePaylinePayment();
+        
+    }}
+    function SavePaylinePayment() {{
+         var cardNumber = $('#card_number').val(); 
+        var payment = {{ token: '1236546987', last4: cardNumber.substring(cardNumber.length - 4), type: 'VISA', expireMonth: '12', expireYear: '23'}};
+
+        DS_SavePaymentMethod(payment);
     }}    
+    function ValidateEmail(mail) {{
+     if (/^[a-zA-Z0-9.!#$%&'*+/=?^_`{{|}}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/.test(mail)) {{
+        return (true)
+     }}
+     return (false)
+    }}
 </script>
 {GetStyles()}";
 
@@ -117,18 +192,18 @@ namespace PaylineDirectScale
                              </div>
                          </div>
                          <div class='panel-body'>
-                             <form role='form'>
+                             <form id='paymentForm' role='form'>
                                  <div class='row'>
                                      <div class='col-xs-12'>
-                                         <div class='form-group'> <label>CARD NUMBER</label> <input type='text' id='cardNumber' class='form-control'> </div>
+                                         <div class='form-group'> <label>CARD NUMBER</label> <input type='text' id='card_number' class='form-control'> </div>
                                      </div>
                                  </div>
                                  <div class='row'>
                                      <div class='col-xs-6'>
-                                         <div class='form-group'> <label>CARD EXPIRY</label> <input type='text' id='cardExpiry' class='form-control' placeholder='MM/YY' onkeyup='addSlashes(this)'> </div>
+                                         <div class='form-group'> <label>CARD EXPIRY</label> <input type='text' id='cardExpiry' class='form-control' placeholder='MM/YY' onkeyup='addSlashes(this)' maxlength='5'> </div>
                                      </div>
                                      <div class='col-xs-6'>
-                                         <div class='form-group'> <label>CVV</label> <input type='text' id='cardCVV' class='form-control' placeholder='CVV'> </div>
+                                         <div class='form-group'> <label>CVV</label> <input type='text' id='cardCVV' class='form-control' placeholder='CVV' maxlength='3'> </div>
                                      </div>
                                  </div>
                                  <div class='row'>
@@ -148,7 +223,7 @@ namespace PaylineDirectScale
                          </div>
                          <div class='panel-footer'>
                              <div class='row'>
-                                 <div class='col-xs-12'> <button id='pay-button' class=' btn btn-success btn-lg btn-block'>Save Payment</button> </div>
+                                 <div class='col-xs-12'> <button id='pay-button' onclick='sendPaymentToPayline()' class='btn btn-success btn-lg btn-block'>Save Payment</button> </div>
                              </div>
                          </div>
                      </div>
@@ -281,28 +356,27 @@ namespace PaylineDirectScale
 
             try
             {
-                //var result = myWebPaymentAPI.doWebPayment("30", ExtractPayment(),
-                //                              "https://localhost:44346/Home/About",
-                //                              "https://localhost:44346/Home/Contact",
-                //                              ExtractDummyOrder(),
-                //                              "https://localhost:44346/Home/About",
-                //                              new string[] { "0002432" },
-                //                              new string[] { },
-                //                              null,
-                //                              "FR",
-                //                              "",
-                //                              new buyer() { email = $"{(isTempAssociate ? "" : associate.EmailAddress)}" },
-                //                               null, "SSL", null, null, null, null, null, null, null,
-                //                               new threeDSInfo() { challengeInd = "01", threeDSReqPriorAuthMethod = "01", threeDSReqPriorAuthTimestamp = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss") },
-                //                               null, null,
-                //                              out string token,
-                //                              out string redirectURL,
-                //                              out string stepCode,
-                //                              out string reqCode,
-                //                              out string method);
-                //LogMessage($"{DateTime.UtcNow} - associate:{associate.AssociateId}, isTempAssociate:{isTempAssociate}, token: {token}", "GetToken");
-                //return token;
-                return string.Empty;
+                var result = myWebPaymentAPI.doWebPayment("30", ExtractPayment(),
+                                              "https://localhost:44346/Home/About",
+                                              "https://localhost:44346/Home/Contact",
+                                              ExtractDummyOrder(),
+                                              "https://localhost:44346/Home/About",
+                                              new string[] { "0002432" },
+                                              new string[] { },
+                                              null,
+                                              "FR",
+                                              "",
+                                              new buyer() { email = $"{(isTempAssociate ? "" : associate.EmailAddress)}" },
+                                               null, "SSL", null, null, null, null, null, null, null,
+                                               new threeDSInfo() { challengeInd = "01", threeDSReqPriorAuthMethod = "01", threeDSReqPriorAuthTimestamp = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss") },
+                                               null, null,
+                                              out string token,
+                                              out string redirectURL,
+                                              out string stepCode,
+                                              out string reqCode,
+                                              out string method);
+                LogMessage($"{DateTime.UtcNow} - associate:{associate.AssociateId}, isTempAssociate:{isTempAssociate}, token: {token}", "GetToken");
+                return token;
             }
             catch (Exception ex)
             {
