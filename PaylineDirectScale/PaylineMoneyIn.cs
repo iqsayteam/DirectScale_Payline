@@ -9,6 +9,7 @@ using PaylineDirectScale.Services;
 using SDKPaylineDotNet.WebPaymentAPI;
 using System;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace PaylineDirectScale
@@ -55,11 +56,11 @@ namespace PaylineDirectScale
 
         public override string GenerateOneTimeAuthToken(string payerId, int associateId, string languageCode, string countryCode)
         {
-            //return _paylineService.GetHashCode().ToString();
-            LogMessage($"{DateTime.UtcNow} - PayerId:{payerId}, associateId:{associateId},languageCode:{languageCode},countrycode:{countryCode}", "GenerateOneTimeAuthToken");
-            var associate = _associateService.GetAssociate(associateId);
-            var isTempAssociate = associate.AssociateBaseType == 0;
-            return GetToken(associate, isTempAssociate);
+            return _paylineService.GetHashCode().ToString();
+            //LogMessage($"{DateTime.UtcNow} - PayerId:{payerId}, associateId:{associateId},languageCode:{languageCode},countrycode:{countryCode}", "GenerateOneTimeAuthToken");
+            //var associate = _associateService.GetAssociate(associateId);
+            //var isTempAssociate = associate.AssociateBaseType == 0;
+            //return GetToken(associate, isTempAssociate);
         }
 
         public override SavePaymentForm GetSavePaymentForm(string payerId, int associateId, string languageCode, string countryCode, string oneTimeAuthToken)
@@ -68,6 +69,7 @@ namespace PaylineDirectScale
 
             var associate = _associateService.GetAssociate(associateId);
             var isTempAssociate = associate.AssociateBaseType == 0;
+            string crypted = encrypt($"{_paylineSettings.PaylineMerchantId}{oneTimeAuthToken}{_paylineSettings.PaylineContractNumber}",$"{_paylineSettings.PaylineMerchantSecretKey}");
             string head = $@"
                          <script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>
                          <script src='https://igorescobar.github.io/jQuery-Mask-Plugin/js/jquery.mask.min.js'></script>
@@ -119,7 +121,7 @@ namespace PaylineDirectScale
             if (!msg || (msg.event != 'change')) return;
             if (msg.message && msg.message.payload) {{ 
                 var payload = msg.message.payload;
-                //console.log('card type: ' + payload.cardType + ' / complete: ' + payload.complete);
+                console.log('card type: ' + payload.cardType + ' / complete: ' + payload.complete);
                 if (payload.complete) {{
                     // Possible card types: visa, mastercard, amex, diners, discover, jcb, dankort, unionPay
                     window.cardValid = true;
@@ -150,18 +152,36 @@ namespace PaylineDirectScale
     function ShowPaylineError(msg) {{
         $('#pay-button').text('Save Payment').prop('disabled', false);
     }}
-    function sendPaymentToNuvei() {{
-        var cardHolderVal = document.getElementById('cardHolderName').value;
-        var emailVal = document.getElementById('cardHolderEmail').value;
+    function sendPaymentToPayline() {{
+            var cardNumber = $('#card_number').val(); 
+            console.log(data={crypted}&accessKeyRef={_paylineSettings.PaylineMerchantSecretKey}&cardNumber=$('#card_number').val()&cardExpirationDate=$('#cardExpiry').val()&cardCvx=$('#cardCVV').val());
+            
+            jQuery.support.cors = true; // enable cross-domain ajax requests
+            $.ajax({{
+            type: 'POST',
+            url: 'https://homologation-webpayment.payline.com/webpayment/getToken',
+            data: data={crypted}&accessKeyRef={_paylineSettings.PaylineMerchantSecretKey}&cardNumber=$('#card_number').val()&cardExpirationDate=$('#cardExpiry').val()&cardCvx=$('#cardCVV').val(),
+            success: function(msg)
+                {{ 
+                     alert('sucess' + msg);
+                }},
+            error:function (xhr, status, error)
+                {{
+                    alert(error);
+                }}
+            }});
 
-        if (!cardFormValidate()) return;
+        // var cardHolderVal = document.getElementById('cardHolderName').value;
+        //var emailVal = document.getElementById('cardHolderEmail').value;
 
-        SavePaylinePayment();
+        //if (!cardFormValidate()) return;
+
+        SavePaylinePayment(crypted);
         
     }}
-    function SavePaylinePayment() {{
+    function SavePaylinePayment(string token) {{
          var cardNumber = $('#card_number').val(); 
-        var payment = {{ token: '1236546987', last4: cardNumber.substring(cardNumber.length - 4), type: 'VISA', expireMonth: '12', expireYear: '23'}};
+        var payment = {{ token: token, last4: cardNumber.substring(cardNumber.length - 4), type: 'VISA', expireMonth: '12', expireYear: '23'}};
 
         DS_SavePaymentMethod(payment);
     }}    
@@ -646,5 +666,36 @@ namespace PaylineDirectScale
             }
         }
 
+        public string encrypt(string word, string password)
+        {
+            try
+            {
+                byte[] ivBytes;
+                Random random = new Random();
+                byte[] bytes = new byte[20];
+                random.NextBytes(bytes);
+                byte[] saltBytes = bytes;
+
+                RijndaelManaged rijndaelManaged = new RijndaelManaged();
+                var keyGen = new Rfc2898DeriveBytes(password, saltBytes, 50);
+                Rijndael rijndael = Rijndael.Create();
+                byte[] key = keyGen.GetBytes(rijndael.KeySize / 8);
+                byte[] AESIV = keyGen.GetBytes(rijndael.BlockSize / 8);
+                rijndaelManaged.Mode = CipherMode.CBC;
+                rijndaelManaged.Padding = PaddingMode.PKCS7;
+                rijndaelManaged.Key = key;
+                rijndaelManaged.IV = AESIV;
+
+                var plainBytes = Encoding.UTF8.GetBytes(word);
+                byte[] encryptedTextBytes = rijndaelManaged.CreateEncryptor().TransformFinalBlock(plainBytes, 0, plainBytes.Length);
+
+                return Convert.ToBase64String(encryptedTextBytes);//new Base64().encodeToString(buffer);
+                                                                  // return Base64.encodeBase64String(buffer);
+            }
+            catch (Exception ex)
+            {
+                return "ER001" + ex.ToString();
+            }
+        }
     }
 }

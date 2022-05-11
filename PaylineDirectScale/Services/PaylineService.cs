@@ -28,7 +28,7 @@ namespace PaylineDirectScale.Services
 
         }
 
-        private MerchantInfo NuveiMerchantInfo
+        private MerchantInfo PaylineMerchantInfo
         {
             get
             {

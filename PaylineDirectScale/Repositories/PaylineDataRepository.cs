@@ -130,6 +130,9 @@ namespace PaylineDirectScale.Repositories
                         case "PaylineReCaptchaSecretKey":
                             settings.ReCaptchaSecretKey = setting.SettingValue;
                             break;
+                        case "PaylineContractNumber":
+                            settings.PaylineContractNumber = setting.SettingValue;
+                            break;
                         default:
                             break;
                     }

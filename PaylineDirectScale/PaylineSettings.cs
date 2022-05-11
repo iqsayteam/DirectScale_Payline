@@ -22,6 +22,7 @@ namespace PaylineDirectScale
         private string _paylineAcceptedCardTypes;
         private string _paylineRedirectDisplayName;
         private string _paylineSavedPaymentDisplayName;
+        private string _paylineContractNumber;
 
         private DateTime InstantiationTime { get; set; }
 
@@ -57,6 +58,7 @@ namespace PaylineDirectScale
             _paylineMerchantId = string.Empty;
             _paylineMerchantSiteId = string.Empty;
             _paylineIFrameDimensions = null;
+            _paylineContractNumber = string.Empty;
         }
 
         public string BaseCallbackUrl { get; set; }
@@ -76,7 +78,7 @@ namespace PaylineDirectScale
         // This is the DirectScale general merchant ID. Site IDs will be specific to clients.
         public string PaylineMerchantId
         {
-            get => UseDirectScaleHardCodedCreds ? "71467481018933" : _paylineMerchantId;
+            get => UseDirectScaleHardCodedCreds ? "49132203652740" : _paylineMerchantId;
             set => _paylineMerchantId = value;
         }
 
@@ -90,11 +92,19 @@ namespace PaylineDirectScale
             }
             set => _paylineMerchantSiteId = value;
         }
+        public string PaylineContractNumber
+        {
+            get
+            {
+                return UseDirectScaleHardCodedCreds ? "1234567" : _paylineContractNumber;
+            }
+            set => _paylineContractNumber = value;
+        }
 
         // This is the API key specific to each client's site.  
         public string PaylineMerchantSecretKey
         {
-            get => UseDirectScaleHardCodedCreds ? "vqno3JeQdXlgMuFBaAHY" : _paylineMerchantSecretKey;
+            get => UseDirectScaleHardCodedCreds ? "0Zgn49ToeHP00JLROT2G" : _paylineMerchantSecretKey;
             set => _paylineMerchantSecretKey = value;
         }
 

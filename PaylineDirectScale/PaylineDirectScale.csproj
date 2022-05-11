@@ -8,7 +8,7 @@
 		<OutputType>Library</OutputType>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<PackageId>Directscale.Payline</PackageId>
-		<Version>0.0.5</Version>
+		<Version>0.0.9</Version>
 		<IsPackable>true</IsPackable>
 		<Authors>Bunty Choudhary</Authors>
 		<Company>Payline</Company>
