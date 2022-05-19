@@ -3,7 +3,7 @@
     public class ApiConstants
     {
         // Pre-configured hosts:
-        public const string IntegrationHost = "https://ppp-test.safecharge.com/ppp/";
-        public const string LiveHost = "https://secure.safecharge.com/ppp/";
+        public const string IntegrationHost = "https://homologation-webpayment.payline.com/webpayment/getToken";
+        public const string LiveHost = "https://secure.payline.com/webpayment/getToken";
     }
 }

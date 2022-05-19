@@ -9,5 +9,6 @@
         public string PaymentMethodToken { get; set; }
         public int PaymentId { get; internal set; }
         public string CardType { get; internal set; }
+        public int AssociateId { get; set; }
     }
 }

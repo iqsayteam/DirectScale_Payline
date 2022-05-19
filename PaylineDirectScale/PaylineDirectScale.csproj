@@ -8,7 +8,7 @@
 		<OutputType>Library</OutputType>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<PackageId>Directscale.Payline</PackageId>
-		<Version>0.0.9</Version>
+		<Version>0.2.5</Version>
 		<IsPackable>true</IsPackable>
 		<Authors>Bunty Choudhary</Authors>
 		<Company>Payline</Company>
@@ -16,7 +16,7 @@
 		<Description>Enables the use of Payline server-side elements in the DirectScale Client Extension</Description>
 		<Copyright>2022 DirectScale</Copyright>
 		<PackageTags>GitHub</PackageTags>
-		<PackageReleaseNotes>Added Locale to nuvei redirect/Checkout page</PackageReleaseNotes>
+		<PackageReleaseNotes>add stringify for request data</PackageReleaseNotes>
 		<PackageProjectUrl>https://github.com/iqsayteam/DirectScale_Payline</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/iqsayteam/DirectScale_Payline</RepositoryUrl>
 	</PropertyGroup>
@@ -24,10 +24,10 @@
 	<ItemGroup>
 	  <PackageReference Include="Dapper" Version="2.0.123" />
 	  <PackageReference Include="DirectScale.Disco.Extension.Abstractions" Version="1.0.5038" />
-	  <PackageReference Include="Monext.Payline.DotNetSDK" Version="4.8.4" />
 	</ItemGroup>
 
 	<ItemGroup>
+	  <Reference Include="System.ServiceModel" />
 	  <Reference Include="System.Web.Services" />
 	</ItemGroup>
 </Project>

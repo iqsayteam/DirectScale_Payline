@@ -4,13 +4,16 @@ using DirectScale.Disco.Extension.Services;
 using Newtonsoft.Json;
 using PaylineDirectScale.Model;
 using PaylineDirectScale.Payline.Model;
+using PaylineDirectScale.Payline.Utils;
 using PaylineDirectScale.Repositories;
 using PaylineDirectScale.Services;
-using SDKPaylineDotNet.WebPaymentAPI;
+using ServiceReference1;
 using System;
 using System.Linq;
 using System.Security.Cryptography;
+using System.ServiceModel;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace PaylineDirectScale
 {
@@ -25,6 +28,7 @@ namespace PaylineDirectScale
         private readonly IOrderService _orderService;
         private readonly ISettingsService _settingsService;
         private readonly ICompanyService _companyService;
+
 
         public PaylineMoneyIn(ICurrencyService currencyService,
             IAssociateService associateService,
@@ -47,7 +51,7 @@ namespace PaylineDirectScale
             PaylineDataRepository data = new PaylineDataRepository(_dataService, _loggingService, _settingsService);
 
             _paylineSettings = data.GetSettings(merchInfo.Id);
-            _paylineService = new PaylineService(_associateService, _loggingService, _orderService, _paylineSettings, _companyService);
+            _paylineService = new PaylineService(_associateService, _loggingService, _orderService, _dataService, _paylineSettings, _companyService);
 
             base.PaymentFormWidth = _paylineSettings.IFrameWidth;
             base.PaymentFormHeight = _paylineSettings.IFrameHeight;
@@ -57,19 +61,13 @@ namespace PaylineDirectScale
         public override string GenerateOneTimeAuthToken(string payerId, int associateId, string languageCode, string countryCode)
         {
             return _paylineService.GetHashCode().ToString();
-            //LogMessage($"{DateTime.UtcNow} - PayerId:{payerId}, associateId:{associateId},languageCode:{languageCode},countrycode:{countryCode}", "GenerateOneTimeAuthToken");
-            //var associate = _associateService.GetAssociate(associateId);
-            //var isTempAssociate = associate.AssociateBaseType == 0;
-            //return GetToken(associate, isTempAssociate);
         }
 
         public override SavePaymentForm GetSavePaymentForm(string payerId, int associateId, string languageCode, string countryCode, string oneTimeAuthToken)
         {
-            LogMessage($"{DateTime.UtcNow} - PayerId:{payerId}, associateId:{associateId},languageCode:{languageCode},countrycode:{countryCode},oneTimeAuthToken:{oneTimeAuthToken}", "GetSavePaymentForm");
-
             var associate = _associateService.GetAssociate(associateId);
             var isTempAssociate = associate.AssociateBaseType == 0;
-            string crypted = encrypt($"{_paylineSettings.PaylineMerchantId}{oneTimeAuthToken}{_paylineSettings.PaylineContractNumber}",$"{_paylineSettings.PaylineMerchantSecretKey}");
+
             string head = $@"
                          <script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>
                          <script src='https://igorescobar.github.io/jQuery-Mask-Plugin/js/jquery.mask.min.js'></script>
@@ -114,27 +112,6 @@ namespace PaylineDirectScale
 }}
 
     $(document).ready(() => {{
-        window.addEventListener('message', receiveMessagePayline, false);
-
-        function receiveMessagePayline(event){{ 
-            var msg = JSON.parse(event.data);
-            if (!msg || (msg.event != 'change')) return;
-            if (msg.message && msg.message.payload) {{ 
-                var payload = msg.message.payload;
-                console.log('card type: ' + payload.cardType + ' / complete: ' + payload.complete);
-                if (payload.complete) {{
-                    // Possible card types: visa, mastercard, amex, diners, discover, jcb, dankort, unionPay
-                    window.cardValid = true;
-                    window.cardType = payload.cardType;
-                    //alert('Card Complete! Type: ' + payload.cardType);
-                }} else {{
-                    window.cardValid = false;
-                }}
-                
-            }}
-            //console.log('Event fired: ', event); 
-         }}
-
          $('#card_number').mask('0000 0000 0000 0000');
           $('#paymentForm input[type=text]').on('keyup',function(){{
              cardFormValidate();
@@ -152,36 +129,59 @@ namespace PaylineDirectScale
     function ShowPaylineError(msg) {{
         $('#pay-button').text('Save Payment').prop('disabled', false);
     }}
-    function sendPaymentToPayline() {{
-            var cardNumber = $('#card_number').val(); 
-            console.log(data={crypted}&accessKeyRef={_paylineSettings.PaylineMerchantSecretKey}&cardNumber=$('#card_number').val()&cardExpirationDate=$('#cardExpiry').val()&cardCvx=$('#cardCVV').val());
-            
-            jQuery.support.cors = true; // enable cross-domain ajax requests
-            $.ajax({{
-            type: 'POST',
-            url: 'https://homologation-webpayment.payline.com/webpayment/getToken',
-            data: data={crypted}&accessKeyRef={_paylineSettings.PaylineMerchantSecretKey}&cardNumber=$('#card_number').val()&cardExpirationDate=$('#cardExpiry').val()&cardCvx=$('#cardCVV').val(),
-            success: function(msg)
-                {{ 
-                     alert('sucess' + msg);
-                }},
-            error:function (xhr, status, error)
-                {{
-                    alert(error);
-                }}
+
+    function GetPaylineSessionToken(email,cardNumber) {{
+            var cardMonth = $('#cardExpiry').val().substring(0, 2);
+            var cardYear = $('#cardExpiry').val().substring(4, 6);
+            var expirationDate = cardMonth + cardYear;
+            var cvv = $('#cardCVV').val();
+        return new Promise((resolve, reject) => {{
+            var tokenPayload = {{
+                'DiscoMerchantId': {MerchantInfo.Id},
+                'AssociateId': '{associateId}',
+                'CountryCode': '{ countryCode.ToUpper() }',
+                'Email': email,
+                'CardNumber':cardNumber,
+                'ExpirationDate':expirationDate,
+                'CVV':cvv,
+                'OneTimeAuthToken': {oneTimeAuthToken}
+            }};
+            $.ajax ({{
+                url: '/Command/ClientAPI/payline/getSessionTokenForAuthEvent',
+                type: 'POST',
+                data: JSON.stringify(tokenPayload),
+                dataType: 'json',
+                contentType: 'application/json; charset=utf-8',
+                success: (r) => {{
+		            if (r.SessionToken) {{
+                        resolve(r.SessionToken);
+		            }}
+		            else {{
+			            if (r.ErrorMessage) DS_AddPaymentError('Could not generate session token. Error: ' + r.ErrorMessage, r);
+                        else DS_AddPaymentError('Could not generate session token. Please try again, or refresh the page.', r);
+                    }}
+                 }},
+                 error: (r) => {{ 
+                    DS_AddPaymentError('Error getting session token.', r);
+                 }}
             }});
+        }});
+    }}
 
-        // var cardHolderVal = document.getElementById('cardHolderName').value;
-        //var emailVal = document.getElementById('cardHolderEmail').value;
-
-        //if (!cardFormValidate()) return;
-
-        SavePaylinePayment(crypted);
+    function sendPaymentToPayline() {{
+            var cardHolderVal = document.getElementById('cardHolderName').value;
+            var emailVal = document.getElementById('cardHolderEmail').value;
+            var cardNumber = $('#card_number').val();
+            GetPaylineSessionToken(emailVal,cardNumber).then(sessResult => {{ 
+                   SavePaylinePayment(sessResult);
+            }});
         
     }}
-    function SavePaylinePayment(string token) {{
-         var cardNumber = $('#card_number').val(); 
-        var payment = {{ token: token, last4: cardNumber.substring(cardNumber.length - 4), type: 'VISA', expireMonth: '12', expireYear: '23'}};
+    function SavePaylinePayment(token) {{
+        var cardNumber = $('#card_number').val(); 
+        var cardMonth = $('#cardExpiry').val().substring(0, 2);
+        var cardYear = $('#cardExpiry').val().substring(4, 6);
+        var payment = {{ token: token, last4: cardNumber.substring(cardNumber.length - 4), type: 'VISA', expireMonth: cardMonth, expireYear: cardYear}};
 
         DS_SavePaymentMethod(payment);
     }}    
@@ -287,17 +287,20 @@ namespace PaylineDirectScale
 
             try
             {
-                PaylineChargeData data = new PaylineChargeData
+                PaylineChargeData data = new()
                 {
                     Amount = Convert.ToDecimal(payment.Amount),
                     Currency = payment.CurrencyCode.ToUpper(),
                     PaymentMethodToken = payment.PaymentMethodId,
                     OrderNumber = orderNumber,
-                    CardType = payment.CardType
+                    CardType = payment.CardType,
+                    AssociateId = payerIdIntValue
                 };
+                LogMessage($"{DateTime.UtcNow} - PaylineChargeData:{JsonConvert.SerializeObject(data)}", "PaylineChargeData");
 
                 PaylineChargeResponse chargeResponse = _paylineService.ChargeAmount(data);
 
+                LogMessage($"{DateTime.UtcNow} - PaylineChargeData:{JsonConvert.SerializeObject(chargeResponse)}", "PaylineChargeResponse");
                 res.Response = chargeResponse.ProcessorResponseMessage;
                 res.ResponseId = chargeResponse.ProcessorResponseCode;
                 res.TransactionNumber = chargeResponse.TransactionId;
@@ -369,66 +372,75 @@ namespace PaylineDirectScale
             return payerIdAsInt;
         }
 
-        private string GetToken(Associate associate, bool isTempAssociate)
+        public string GetSessionTokenForAuthEvent(TokenRequest tokenRequest)
         {
-            LogMessage($"{DateTime.UtcNow} - associate:{associate.AssociateId}, isTempAssociate:{isTempAssociate}", "GetToken");
-            WebPaymentAPI myWebPaymentAPI = SDKPaylineDotNet.PaymentApiFactory.GetWebPaymentAPIClient();
+            var sessionToken = Task.Run<string>(async () => await CreateWallet(tokenRequest));
+            return sessionToken.Result;
+        }
+
+        private async Task<string> CreateWallet(TokenRequest tokenRequest)
+        {
+            LogMessage($"{DateTime.UtcNow} - associate:{tokenRequest.AssociateId}", "CreateWallet");
+            var associate = _associateService.GetAssociate(tokenRequest.AssociateId);
 
             try
             {
-                var result = myWebPaymentAPI.doWebPayment("30", ExtractPayment(),
-                                              "https://localhost:44346/Home/About",
-                                              "https://localhost:44346/Home/Contact",
-                                              ExtractDummyOrder(),
-                                              "https://localhost:44346/Home/About",
-                                              new string[] { "0002432" },
-                                              new string[] { },
-                                              null,
-                                              "FR",
-                                              "",
-                                              new buyer() { email = $"{(isTempAssociate ? "" : associate.EmailAddress)}" },
-                                               null, "SSL", null, null, null, null, null, null, null,
-                                               new threeDSInfo() { challengeInd = "01", threeDSReqPriorAuthMethod = "01", threeDSReqPriorAuthTimestamp = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss") },
-                                               null, null,
-                                              out string token,
-                                              out string redirectURL,
-                                              out string stepCode,
-                                              out string reqCode,
-                                              out string method);
-                LogMessage($"{DateTime.UtcNow} - associate:{associate.AssociateId}, isTempAssociate:{isTempAssociate}, token: {token}", "GetToken");
-                return token;
+                var result = await CreateWallet(new createWalletRequest()
+                {
+                    version = _paylineSettings.PaylineVersion,
+                    buyer = new buyer()
+                    {
+                        email = associate.EmailAddress.Trim(),
+                        firstName = associate.Name.Trim()
+                    },
+                    wallet = new wallet
+                    {
+                        walletId = tokenRequest.OneTimeAuthToken,
+                        card = new card
+                        {
+                            cardholder = associate.Name,
+                            cvx = tokenRequest.CVV,
+                            number = tokenRequest.CardNumber,
+                            expirationDate = tokenRequest.ExpirationDate
+                        }
+                    },
+                    contractNumber = _paylineSettings.PaylineContractNumber
+                });
+                if (result != null)
+                {
+                    if (result.result.code == "02500")
+                        return tokenRequest.OneTimeAuthToken;
+                }
+                LogMessage($"{DateTime.UtcNow} - {JsonConvert.SerializeObject(result)}", "CreateWalletError");
             }
             catch (Exception ex)
             {
-                LogMessage($"{DateTime.UtcNow} - {ex.Message}", "GetToken");
+                LogMessage($"{DateTime.UtcNow} - {ex.Message}", "CreateWalletError");
             }
-
-
             return string.Empty;
         }
 
-        private payment ExtractPayment()
+        private async Task<createWalletResponse> CreateWallet(createWalletRequest walletRequest)
         {
-            return new payment
+            var factory = GetDirectFactory();
+            var serviceProxy = PaymentApiFactory.GetDirectServiceProxy(factory);
+            var opContext = new OperationContext((IClientChannel)serviceProxy);
+            var prevOpContext = OperationContext.Current; // Optional if there's no way this might already be set
+            OperationContext.Current = opContext;
+            var result = new createWalletResponse();
+            try
             {
-                amount = "1",
-                currency = "978",
-                action = "101",
-                mode = "CPT",
-                contractNumber = "0002432"
-            };
-        }
-
-        private order ExtractDummyOrder()
-        {
-            return new order
+                result = await serviceProxy.createWalletAsync(walletRequest);
+            }
+            catch
             {
-                @ref = "1",
-                origin = "Xelliss",
-                currency = "978",
-                amount = "1",
-                date = DateTime.Now.ToString("dd/MM/yyyy hh:mm")
-            };
+                throw;
+            }
+            finally
+            {
+                PaymentApiFactory.DisposeServiceProxy(factory, serviceProxy, prevOpContext);
+            }
+            return result;
         }
 
         public string GetStyles()
@@ -666,36 +678,13 @@ namespace PaylineDirectScale
             }
         }
 
-        public string encrypt(string word, string password)
+        public ChannelFactory<DirectPaymentAPI> GetDirectFactory()
         {
-            try
-            {
-                byte[] ivBytes;
-                Random random = new Random();
-                byte[] bytes = new byte[20];
-                random.NextBytes(bytes);
-                byte[] saltBytes = bytes;
-
-                RijndaelManaged rijndaelManaged = new RijndaelManaged();
-                var keyGen = new Rfc2898DeriveBytes(password, saltBytes, 50);
-                Rijndael rijndael = Rijndael.Create();
-                byte[] key = keyGen.GetBytes(rijndael.KeySize / 8);
-                byte[] AESIV = keyGen.GetBytes(rijndael.BlockSize / 8);
-                rijndaelManaged.Mode = CipherMode.CBC;
-                rijndaelManaged.Padding = PaddingMode.PKCS7;
-                rijndaelManaged.Key = key;
-                rijndaelManaged.IV = AESIV;
-
-                var plainBytes = Encoding.UTF8.GetBytes(word);
-                byte[] encryptedTextBytes = rijndaelManaged.CreateEncryptor().TransformFinalBlock(plainBytes, 0, plainBytes.Length);
-
-                return Convert.ToBase64String(encryptedTextBytes);//new Base64().encodeToString(buffer);
-                                                                  // return Base64.encodeBase64String(buffer);
-            }
-            catch (Exception ex)
-            {
-                return "ER001" + ex.ToString();
-            }
+            var factory = new ChannelFactory<DirectPaymentAPI>(PaymentApiFactory.CreateBindingAndInitializeClient(), new EndpointAddress(new Uri(_paylineSettings.PaylineDirectPaymentAPIUrl)));
+            factory.Credentials.UserName.UserName = _paylineSettings.PaylineMerchantId;
+            factory.Credentials.UserName.Password = _paylineSettings.PaylineMerchantSecretKey;
+            return factory;
         }
+
     }
 }

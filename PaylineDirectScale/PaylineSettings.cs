@@ -20,9 +20,10 @@ namespace PaylineDirectScale
         private string _paylineMerchantSecretKey;
         private string _paylineIFrameDimensions;
         private string _paylineAcceptedCardTypes;
-        private string _paylineRedirectDisplayName;
         private string _paylineSavedPaymentDisplayName;
         private string _paylineContractNumber;
+        private string _paylineDirectPaymentAPIUrl;
+        private string _paylineVersion;
 
         private DateTime InstantiationTime { get; set; }
 
@@ -59,6 +60,7 @@ namespace PaylineDirectScale
             _paylineMerchantSiteId = string.Empty;
             _paylineIFrameDimensions = null;
             _paylineContractNumber = string.Empty;
+            _paylineDirectPaymentAPIUrl = string.Empty;
         }
 
         public string BaseCallbackUrl { get; set; }
@@ -106,6 +108,18 @@ namespace PaylineDirectScale
         {
             get => UseDirectScaleHardCodedCreds ? "0Zgn49ToeHP00JLROT2G" : _paylineMerchantSecretKey;
             set => _paylineMerchantSecretKey = value;
+        }
+
+        public string PaylineDirectPaymentAPIUrl
+        {
+            get => UseDirectScaleHardCodedCreds ? "https://homologation.payline.com/V4/services/DirectPaymentAPI" : _paylineDirectPaymentAPIUrl;
+            set => _paylineDirectPaymentAPIUrl = value;
+        }
+
+        public string PaylineVersion
+        {
+            get => UseDirectScaleHardCodedCreds ? "30" : _paylineVersion;
+            set => _paylineVersion = value;
         }
 
         public int IFrameWidth => GetIFrameDimensions("Width");
