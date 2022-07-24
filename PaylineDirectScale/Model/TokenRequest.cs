@@ -28,5 +28,8 @@ namespace PaylineDirectScale.Model
         [JsonProperty("OneTimeAuthToken")]
         public string OneTimeAuthToken { get; set; }
 
+        [JsonProperty("CardType")]
+        public string CardType { get; set; }
+
     }
 }

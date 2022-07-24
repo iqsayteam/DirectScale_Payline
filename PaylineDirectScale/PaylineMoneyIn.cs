@@ -74,48 +74,9 @@ namespace PaylineDirectScale
                          <script src='https://cdnjs.cloudflare.com/ajax/libs/jquery-creditcardvalidator/1.0.0/jquery.creditCardValidator.min.js'></script>
 
  <script>
-    function cardFormValidate(){{
-    var cardValid = false;
-
-    //card number validation
-    $('#card_number').validateCreditCard(function(result){{
-        if(result.valid){{
-            $('#card_number').removeClass('required');
-            cardValid = true;
-        }}else{{
-            $('#card_number').addClass('required');
-            cardValid = false;
-        }}
-    }});
-      
-    //card details validation
-    var cardName = $('#name_on_card').val();
-    var expMonth = $('#expiry_month').val();
-    var expYear = $('#expiry_year').val();
-    var cvv = $('#cvv').val();
-    var regName = /^[a-z ,.'-]+$/i;
-    var regCVV = /^[0-9]{{3,3}}$/;
-    if (!cardValid) {{
-        return cardValid;
-    }}else if (!regCVV.test(cvv)) {{
-        $('#cvv').focus();
-        cardValid = false;
-        return cardValid;
-    }}else if (!regName.test(cardName)) {{
-        cardValid = false;
-        return cardValid;
-    }}else{{
-        return cardValid;
-    }}
-    var email = $('#cardHolderEmail').val();
-    if (email.length < 3 || !ValidateEmail(email)) {{ ShowPaylineError('Please provide a valid email address.'); return cardValid = false; }}
-}}
-
+    
     $(document).ready(() => {{
          $('#card_number').mask('0000 0000 0000 0000');
-          $('#paymentForm input[type=text]').on('keyup',function(){{
-             cardFormValidate();
-         }});
     }});
     function addSlashes (element) {{
            let ele = document.getElementById(element.id);
@@ -130,9 +91,10 @@ namespace PaylineDirectScale
         $('#pay-button').text('Save Payment').prop('disabled', false);
     }}
 
-    function GetPaylineSessionToken(email,cardNumber) {{
+    function GetPaylineSessionToken(email,cardNumber,cardType) {{
+            
             var cardMonth = $('#cardExpiry').val().substring(0, 2);
-            var cardYear = $('#cardExpiry').val().substring(4, 6);
+            var cardYear = $('#cardExpiry').val().substring(3, 6);
             var expirationDate = cardMonth + cardYear;
             var cvv = $('#cardCVV').val();
         return new Promise((resolve, reject) => {{
@@ -144,7 +106,8 @@ namespace PaylineDirectScale
                 'CardNumber':cardNumber,
                 'ExpirationDate':expirationDate,
                 'CVV':cvv,
-                'OneTimeAuthToken': {oneTimeAuthToken}
+                'OneTimeAuthToken': {oneTimeAuthToken},
+                'CardType':cardType
             }};
             $.ajax ({{
                 url: '/Command/ClientAPI/payline/getSessionTokenForAuthEvent',
@@ -172,16 +135,30 @@ namespace PaylineDirectScale
             var cardHolderVal = document.getElementById('cardHolderName').value;
             var emailVal = document.getElementById('cardHolderEmail').value;
             var cardNumber = $('#card_number').val();
-            GetPaylineSessionToken(emailVal,cardNumber).then(sessResult => {{ 
-                   SavePaylinePayment(sessResult);
+
+            const result = $('#card_number').validateCreditCard();
+            var cardValid = false;
+            var cardType = 'VISA';
+            if (result.valid) {{
+                 $('#card_number').removeClass('required');
+                 cardValid = true;
+                 cardType = result.card_type.name;
+            }} else {{
+                 $('#card_number').addClass('required');
+                 cardValid = false;
+            }}
+            if(!cardValid) return;
+
+            GetPaylineSessionToken(emailVal,cardNumber,cardType).then(sessResult => {{ 
+                   SavePaylinePayment(sessResult,cardType);
             }});
         
     }}
-    function SavePaylinePayment(token) {{
+    function SavePaylinePayment(token,cardType) {{
         var cardNumber = $('#card_number').val(); 
         var cardMonth = $('#cardExpiry').val().substring(0, 2);
-        var cardYear = $('#cardExpiry').val().substring(4, 6);
-        var payment = {{ token: token, last4: cardNumber.substring(cardNumber.length - 4), type: 'VISA', expireMonth: cardMonth, expireYear: cardYear}};
+        var cardYear = $('#cardExpiry').val().substring(3, 6);
+        var payment = {{ token: token, last4: cardNumber.substring(cardNumber.length - 4), type: cardType, expireMonth: cardMonth, expireYear: cardYear}};
 
         DS_SavePaymentMethod(payment);
     }}    
@@ -214,16 +191,14 @@ namespace PaylineDirectScale
                          <div class='panel-body'>
                              <form id='paymentForm' role='form'>
                                  <div class='row'>
-                                     <div class='col-xs-12'>
-                                         <div class='form-group'> <label>CARD NUMBER</label> <input type='text' id='card_number' class='form-control'> </div>
-                                     </div>
-                                 </div>
-                                 <div class='row'>
                                      <div class='col-xs-6'>
-                                         <div class='form-group'> <label>CARD EXPIRY</label> <input type='text' id='cardExpiry' class='form-control' placeholder='MM/YY' onkeyup='addSlashes(this)' maxlength='5'> </div>
+                                         <div class='form-group'> <label>CARD DETAIL</label> <input type='text' id='card_number' placeholder='CARD NUMBER' class='form-control'> </div>
                                      </div>
-                                     <div class='col-xs-6'>
-                                         <div class='form-group'> <label>CVV</label> <input type='text' id='cardCVV' class='form-control' placeholder='CVV' maxlength='3'> </div>
+                                     <div class='col-xs-3'>
+                                         <div class='form-group'> <label></label> <input type='text' id='cardExpiry' class='form-control' placeholder='MM/YY' onkeyup='addSlashes(this)' maxlength='5'> </div>
+                                     </div>
+                                     <div class='col-xs-3'>
+                                         <div class='form-group'> <label></label> <input type='text' id='cardCVV' class='form-control' placeholder='CVV' maxlength='3'> </div>
                                      </div>
                                  </div>
                                  <div class='row'>
@@ -380,32 +355,37 @@ namespace PaylineDirectScale
 
         private async Task<string> CreateWallet(TokenRequest tokenRequest)
         {
-            LogMessage($"{DateTime.UtcNow} - associate:{tokenRequest.AssociateId}", "CreateWallet");
-            var associate = _associateService.GetAssociate(tokenRequest.AssociateId);
-
+            var associate = _associateService.GetAssociate(Convert.ToInt32(tokenRequest.AssociateId));
+            if (associate == null) throw new ArgumentNullException($"associate of {tokenRequest.AssociateId} is invalid.");
+            
             try
             {
-                var result = await CreateWallet(new createWalletRequest()
+                var walletRequest = new createWalletRequest()
                 {
                     version = _paylineSettings.PaylineVersion,
                     buyer = new buyer()
                     {
                         email = associate.EmailAddress.Trim(),
-                        firstName = associate.Name.Trim()
+                        firstName = associate.Name
                     },
                     wallet = new wallet
                     {
                         walletId = tokenRequest.OneTimeAuthToken,
                         card = new card
                         {
-                            cardholder = associate.Name,
-                            cvx = tokenRequest.CVV,
-                            number = tokenRequest.CardNumber,
-                            expirationDate = tokenRequest.ExpirationDate
+                            cardholder = associate.Name.Trim(),
+                            cvx = tokenRequest.CVV.Trim(),
+                            number = tokenRequest.CardNumber.Trim(),
+                            expirationDate = tokenRequest.ExpirationDate.Trim(),
+                            type = tokenRequest.CardType.ToUpper()
                         }
                     },
                     contractNumber = _paylineSettings.PaylineContractNumber
-                });
+                };
+
+                LogMessage($"{DateTime.UtcNow} - WalletRequest: {JsonConvert.SerializeObject(walletRequest)}", "CreateWallet2");
+
+                var result = await CreateWallet(walletRequest);
                 if (result != null)
                 {
                     if (result.result.code == "02500")
@@ -446,6 +426,11 @@ namespace PaylineDirectScale
         public string GetStyles()
         {
             return $@"<style>
+
+    #paymentForm label{{
+    margin-bottom:0px !important;
+    }}
+  
     .container {{
       display: flex;
       flex-wrap: wrap;
@@ -583,37 +568,7 @@ namespace PaylineDirectScale
       color: #4a5568;
       line-height: 1.8;
     }}
-
-
-     .sfcModal-header {{
-	     height: 1.5rem;
-    }}
-     .sfcModal-dialog {{
-	     margin: 55px auto;
-	     max-width: 492px;
-	     position: relative;
-	     width: auto;
-    }}
-     .sfcModal-content {{
-	     background-clip: padding-box;
-	     background-color: #ffffff;
-	     border: 1px solid #dfdfdf;
-	     outline: 0;
-	     position: relative;
-    }}
-    .sfcModal-close {{
- 	     border: 0;
- 	     color: #2c2a2a;
- 	     cursor: pointer;
- 	     font-size: .9rem;
- 	     padding: 0;
- 	     position: absolute;
- 	     right: 0.5rem;
- 	     top: 0.4rem;
-     }}
-     .sfcIcon--close:before {{
- 	     content: '\2716';
-     }}
+    
     div#scard-errors {{
         color: red;
     }}

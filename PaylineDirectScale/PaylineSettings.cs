@@ -6,13 +6,13 @@ namespace PaylineDirectScale
     public class PaylineSettings
     {
         public const int PAYLINE_EUR_DISCO_MERCHANTID = 9861;
-        public const string PAYLINE_DEFAULT_IFRAMEDIMENSIONS = "550x450";
-        public const string PAYLINE_DEFAULT_ACCEPTEDCARDTYPES = "visa,mastercard"; // possibilities: visa, mastercard, amex, diners, discover, jcb, dankort, unionPay
-        public const string PAYLINE_VALID_ACCEPTEDCARDTYPES = "visa,mastercard";
+        public const string PAYLINE_DEFAULT_IFRAMEDIMENSIONS = "450x300";
+        public const string PAYLINE_DEFAULT_ACCEPTEDCARDTYPES = "visa,mastercard,amex"; // possibilities: visa, mastercard, amex, diners, discover, jcb, dankort, unionPay
+        public const string PAYLINE_VALID_ACCEPTEDCARDTYPES = "visa,mastercard,amex";
         public const string PAYLINE_DEFAULT_SAVEDPAYMENT_DISPLAYNAME = "Payline Credit Card";
         public readonly HashSet<string> PAYLINE_ACCEPTED_LOCALES = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         { "en_US","en_UK","de_DE","zh_CN","iw_IL","fr_FR","nl_NL","in_ID","it_IT","ja_JP","ko_KR","lt_LT","es_ES","en_CA","en_AU","ru_RU","ar_AA","pt_BR","sv_SE","tr_TR","sl_SI","da_DK","ro_RO","bg_BG","pl_PL","hu_HU","vi_VL" };
-
+       
 
         private string _paylineEnvironment;
         private string _paylineMerchantId;

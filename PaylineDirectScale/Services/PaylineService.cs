@@ -48,6 +48,10 @@ namespace PaylineDirectScale.Services
             }
         }
 
+        private const string PAYLINE_PAYMENT_CURRENCY = "978"; //EUR
+        private const string PAYLINE_PAYMENT_ACTION = "101";
+        private const string PAYLINE_PAYMENT_MODE = "CPT";
+
         public PaylineChargeResponse ChargeAmount(PaylineChargeData data)
         {
             LogMessage($"{DateTime.UtcNow} - PaylineChargeData:{JsonConvert.SerializeObject(data)}", "ChargeAmount");
@@ -120,8 +124,10 @@ namespace PaylineDirectScale.Services
         private async Task<doImmediateWalletPaymentResponse> CreateWalletRequest(DirectScale.Disco.Extension.Order orderInfo, string walletId,int associateId, decimal amount)
         {
             var associate = _associateService.GetAssociate(associateId);
-            return await DoImmediateWalletPayment(new doImmediateWalletPaymentRequest()
+
+            var immediateRequest = new doImmediateWalletPaymentRequest()
             {
+                version = _paylineSettings.PaylineVersion,
                 threeDSInfo = new threeDSInfo() { challengeInd = "01", threeDSReqPriorAuthMethod = "01", threeDSReqPriorAuthTimestamp = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss") },
                 walletId = walletId,
                 payment = ExtractPayment(orderInfo, _paylineSettings.PaylineContractNumber),
@@ -150,11 +156,14 @@ namespace PaylineDirectScale.Services
                         state = associate.ShipAddress?.State,
                         country = associate.ShipAddress?.CountryCode,
                         zipCode = associate.ShipAddress?.PostalCode,
-                        
+
                     }
                 },
                 order = ExtractOrderInfo(orderInfo)
-            });
+            };
+
+            LogMessage($"{DateTime.UtcNow} - immediateRequest:{JsonConvert.SerializeObject(immediateRequest)}", "ImmediateWalletPaymentRequest");
+            return await DoImmediateWalletPayment(immediateRequest);
         }
 
         public async Task<doImmediateWalletPaymentResponse> DoImmediateWalletPayment(doImmediateWalletPaymentRequest immediateWalletPaymentRequest)
@@ -225,9 +234,9 @@ namespace PaylineDirectScale.Services
             return new payment()
             {
                 amount = amount.ToString(),
-                currency = "978",
-                action = "101", //123
-                mode = "CPT", //REC
+                currency = PAYLINE_PAYMENT_CURRENCY,
+                action = PAYLINE_PAYMENT_ACTION, //123
+                mode = PAYLINE_PAYMENT_MODE, //REC
                 contractNumber = paylineContractNumber
             };
         }

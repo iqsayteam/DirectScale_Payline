@@ -8,7 +8,7 @@
 		<OutputType>Library</OutputType>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<PackageId>Directscale.Payline</PackageId>
-		<Version>0.2.5</Version>
+		<Version>0.3.3</Version>
 		<IsPackable>true</IsPackable>
 		<Authors>Bunty Choudhary</Authors>
 		<Company>Payline</Company>
@@ -16,7 +16,7 @@
 		<Description>Enables the use of Payline server-side elements in the DirectScale Client Extension</Description>
 		<Copyright>2022 DirectScale</Copyright>
 		<PackageTags>GitHub</PackageTags>
-		<PackageReleaseNotes>add stringify for request data</PackageReleaseNotes>
+		<PackageReleaseNotes>Fix design issue for Iframe</PackageReleaseNotes>
 		<PackageProjectUrl>https://github.com/iqsayteam/DirectScale_Payline</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/iqsayteam/DirectScale_Payline</RepositoryUrl>
 	</PropertyGroup>

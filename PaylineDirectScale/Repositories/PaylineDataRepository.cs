@@ -133,6 +133,12 @@ namespace PaylineDirectScale.Repositories
                         case "PaylineContractNumber":
                             settings.PaylineContractNumber = setting.SettingValue;
                             break;
+                        case "PaylineVersion":
+                            settings.PaylineVersion = setting.SettingValue;
+                            break;
+                        case "PaylineDirectPaymentAPIUrl":
+                            settings.PaylineDirectPaymentAPIUrl = setting.SettingValue;
+                            break;
                         default:
                             break;
                     }
